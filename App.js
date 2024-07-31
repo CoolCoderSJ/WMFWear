@@ -46,7 +46,7 @@ client = new Client();
 client
   .setEndpoint('https://appwrite.shuchir.dev/v1')
   .setProject('wheresmyflight')
-  .setPlatform('dev.shuchir.wmfwear');
+  .setPlatform('dev.shuchir.wheresmyflight');
 
 get('sessToken').then((value) => {
   console.log(value)

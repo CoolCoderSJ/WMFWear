@@ -19,7 +19,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "dev.shuchir.wmfwear"
+      "package": "dev.shuchir.wheresmyflight"
     },
     "web": {
       "favicon": "./assets/favicon.png"

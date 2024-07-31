@@ -1,4 +1,4 @@
-package dev.shuchir.wmfwear
+package dev.shuchir.wheresmyflight
 
 import android.app.Application
 import android.content.res.Configuration
