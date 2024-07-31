@@ -1,10 +1,16 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, BackHandler } from 'react-native';
 import { Client, Account, ID, Databases } from 'react-native-appwrite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as React from 'react';
 import Toast, { BaseToast, ErrorToast, InfoToast } from 'react-native-toast-message';
 import RNRestart from 'react-native-restart';
 import axios from 'axios';
+import {
+  LineChart,
+} from "react-native-chart-kit";
+
+import { Dimensions } from "react-native";
+const screenWidth = Dimensions.get("window").width;
 
 const setObj = async (key, value) => { try { const jsonValue = JSON.stringify(value); await AsyncStorage.setItem(key, jsonValue) } catch (e) { console.log(e) } }
 const setPlain = async (key, value) => { try { await AsyncStorage.setItem(key, value) } catch (e) { console.log(e) } }
@@ -17,6 +23,19 @@ let client;
 let account;
 let sessId;
 let db;
+let f;
+let sdt, edt, sat, eat, adt, aat, sData, aData;
+
+const chartConfig = {
+  backgroundGradientFrom: "#1E2923",
+  backgroundGradientFromOpacity: 0,
+  backgroundGradientTo: "#08130D",
+  backgroundGradientToOpacity: 0.5,
+  color: (opacity = 1) => `rgba(26, 255, 146, ${opacity})`,
+  strokeWidth: 2, // optional, default 3
+  barPercentage: 0.5,
+  useShadowColorFromDataset: false // optional
+};
 
 get('sessId').then((value) => {
   console.log(value)
@@ -42,13 +61,21 @@ let flights = [];
 export default function App() {
   const [, forceUpdate] = React.useReducer(x => x + 1, 0);
   const [form, setForm] = React.useState(null);
-  const [flightPage, setFlightPage] = React.useState(null);
+  const [flightPage, setFlightPage] = React.useState(false);
 
   React.useEffect(() => {
     get('sessId').then((value) => {
       console.log(value)
       sessId = value;
       forceUpdate();
+
+      if (sessId) {
+        db.listDocuments("data", "flights").then((res) => {
+          flights = res.documents.reverse();
+          forceUpdate();
+        })
+      }
+
     })
   }, [])
 
@@ -77,6 +104,14 @@ export default function App() {
       />
     )
   };
+
+  BackHandler.addEventListener('hardwareBackPress', function () {
+    if (flightPage) {
+      setFlightPage(false);
+      return true;
+    }
+    return false;
+  })
 
   const loginFunc = async () => {
     let email = form.username;  
@@ -141,13 +176,6 @@ export default function App() {
         autoHide: false
       })
     }
-  }
-
-  if (sessId) {
-    db.listDocuments("data", "flights").then((res) => {
-      flights = res.documents.reverse();
-      forceUpdate();
-    })
   }
 
   return (
@@ -253,7 +281,42 @@ export default function App() {
         }
 
         return (
-          <TouchableOpacity style={styles.outer}>
+          <TouchableOpacity key={index} style={styles.outer} onPress={() => {
+            f = flight; 
+            sdt = f.fullData[19] ? f.fullData[19].replace("Z", "") : "";
+            edt = f.fullData[20] ? f.fullData[20].replace("Z", "") : "";
+            sat = f.fullData[22] ? f.fullData[22].replace("Z", "") : "";
+            eat = f.fullData[23] ? f.fullData[23].replace("Z", "") : "";
+            adt = f.fullData[21] ? f.fullData[21].replace("Z", "") : "";
+            aat = f.fullData[24] ? f.fullData[24].replace("Z", "") : "";
+
+            sData = {
+              labels: [],
+              datasets: [
+                {
+                  data: JSON.parse(f.speed),
+                }
+              ],
+            };
+
+            for (let i = 0; i < JSON.parse(f.speed).length; i++) {
+              sData.labels.push(i)
+            }
+
+            aData = {
+              labels: [],
+              datasets: [
+                {
+                  data: JSON.parse(f.altitude),
+                }
+              ],
+            };
+
+            for (let i = 0; i < JSON.parse(f.altitude).length; i++) {
+              aData.labels.push(i)
+            }
+            setFlightPage(true)
+            }}>
             <View style={styles.left}>
               <Text style={styles.text}>{flight.flightId}</Text>
               <Text style={{...styles.text, ...styles.bigger}}>{flight.airport[0]}</Text>
@@ -274,6 +337,158 @@ export default function App() {
 
       {sessId && flightPage &&
           <ScrollView contentContainerStyle={{ paddingVertical: 50, paddingLeft: 10 }}>
+
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Aircraft</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[0]}</Text>
+            </View>
+
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Airline</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[1]}</Text>
+            </View>
+
+            <Text style={{...styles.text, ...styles.heading, marginTop: 12, marginLeft: 5 }}>Departure</Text>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Timezone</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[2]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Airport</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[3].split(" (")[0]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>City</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[4]}</Text>
+            </View>
+
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Sched. Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{sdt ? (new Date(Date.parse(sdt)).toLocaleTimeString().split(" ")[0].split(":").splice(0, 2)).join(":") + " " + new Date(Date.parse(sdt)).toLocaleTimeString().split(" ")[1] : "N/A"}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Est. Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{edt ? (new Date(Date.parse(edt)).toLocaleTimeString().split(" ")[0].split(":").splice(0, 2)).join(":") + " " + new Date(Date.parse(edt)).toLocaleTimeString().split(" ")[1] : "N/A"}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Act. Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{adt ? (new Date(Date.parse(adt)).toLocaleTimeString().split(" ")[0].split(":").splice(0, 2)).join(":") + " " + new Date(Date.parse(adt)).toLocaleTimeString().split(" ")[1] : "N/A"}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Runway</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.runwayTimes[0]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[5]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Terminal</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[6]}</Text>
+            </View>
+
+
+
+            <Text style={{...styles.text, ...styles.heading, marginTop: 12, marginLeft: 5 }}>Arrival</Text>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Timezone</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[7]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Airport</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[8].split(" (")[0]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>City</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[9]}</Text>
+            </View>
+
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Sched. Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{sat ? (new Date(Date.parse(sat)).toLocaleTimeString().split(" ")[0].split(":").splice(0, 2)).join(":") + " " + new Date(Date.parse(sat)).toLocaleTimeString().split(" ")[1] : "N/A"}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Est. Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{eat ? (new Date(Date.parse(eat)).toLocaleTimeString().split(" ")[0].split(":").splice(0, 2)).join(":") + " " + new Date(Date.parse(eat)).toLocaleTimeString().split(" ")[1] : "N/A"}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Act. Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{aat ? (new Date(Date.parse(aat)).toLocaleTimeString().split(" ")[0].split(":").splice(0, 2)).join(":") + " " + new Date(Date.parse(aat)).toLocaleTimeString().split(" ")[1] : "N/A"}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Runway</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.runwayTimes[1]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Gate</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[10]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Terminal</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[11]}</Text>
+            </View>
+
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Baggage Claim</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.baggageClaim}</Text>
+            </View>
+
+
+
+
+            <Text style={{...styles.text, ...styles.heading, marginTop: 12, marginLeft: 5 }}>Distance</Text>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Actual</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[12]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Planned</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[13]}</Text>
+            </View>
+            <View style={styles.outer2}>
+              <Text style={{...styles.text, ...styles.heading}}>Taken</Text>
+              <Text style={{...styles.text, textAlign: "right"}}>{f.fullData[14]}</Text>
+            </View>
+
+
+            <Text style={{...styles.text, ...styles.heading, marginTop: 12, marginLeft: 5 }}>Speed</Text>
+            <LineChart
+              data={sData}
+              width={175}
+              height={220}
+              chartConfig={chartConfig}
+              withDots={false}
+              withVerticalLabels={false}
+              withHorizontalLabels={false}
+              style={{
+                marginLeft: 0,
+                width: 150,
+                paddingRight: 0,
+                borderRadius: 16,
+              }}
+              bezier
+              hideLegend={true}
+            />
+
+            <Text style={{...styles.text, ...styles.heading, marginTop: 12, marginLeft: 5 }}>Altitude</Text>
+            <LineChart
+              data={aData}
+              width={175}
+              height={220}
+              chartConfig={chartConfig}
+              withDots={false}
+              withVerticalLabels={false}
+              withHorizontalLabels={false}
+              style={{
+                marginLeft: 0,
+                width: 150,
+                paddingRight: 0,
+                borderRadius: 16,
+              }}
+              bezier
+              hideLegend={true}
+            />
+            
           </ScrollView>
       }
 
@@ -325,6 +540,16 @@ const styles = StyleSheet.create({
     flexDirection: "row"
   },
 
+  outer2: {
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    width: 175,
+    alignItems: "center",
+    marginVertical: 2,
+    flexDirection: "row",
+    gap: 10
+  },
+
   left: {
     flex: 1
   },
@@ -341,6 +566,12 @@ const styles = StyleSheet.create({
 
   smaller: {
     fontSize: 12
+  },
+
+  heading: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#9fc6ff"
   }
 
 });
