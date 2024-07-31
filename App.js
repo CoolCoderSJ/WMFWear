@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native';
-import { Client, Account, ID } from 'react-native-appwrite';
+import { Client, Account, ID, Databases } from 'react-native-appwrite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
-import Toast from 'react-native-toast-message';
+import Toast, { BaseToast, ErrorToast, InfoToast } from 'react-native-toast-message';
+import RNRestart from 'react-native-restart';
 
 
 const setObj = async (key, value) => { try { const jsonValue = JSON.stringify(value); await AsyncStorage.setItem(key, jsonValue) } catch (e) { console.log(e) } }
@@ -15,6 +16,7 @@ const getAll = async () => { try { const keys = await AsyncStorage.getAllKeys();
 let client;
 let account;
 let sessId;
+let db;
 
 get('sessId').then((value) => {
   console.log(value)
@@ -28,10 +30,45 @@ client
   .setPlatform('dev.shuchir.wmfwear');
 
 account = new Account(client);
+db = new Databases(client);
 
 export default function App() {
   const [, forceUpdate] = React.useReducer(x => x + 1, 0);
   const [form, setForm] = React.useState(null);
+
+  React.useEffect(() => {
+    get('sessId').then((value) => {
+      console.log(value)
+      sessId = value;
+      forceUpdate();
+    })
+  }, [])
+
+  const toastConfig = {
+    success: (props) => (
+      <BaseToast
+        {...props}
+        style={{ width: 150 }}
+        contentContainerStyle={{ width: 150 }}
+      />
+    ),
+
+    error: (props) => (
+      <ErrorToast
+        {...props}
+        style={{ width: 150 }}
+        contentContainerStyle={{ width: 150 }}
+      />
+    ),
+
+    info: (props) => (
+      <InfoToast
+        {...props}
+        style={{ width: 150 }}
+        contentContainerStyle={{ width: 150 }}
+      />
+    )
+  };
 
   const loginFunc = async () => {
     let email = form.username;  
@@ -54,16 +91,12 @@ export default function App() {
 
     try { 
       account.createEmailPasswordSession(email, password)
-      .then((details) => {
-        console.log("DETAILS", details)
-        setPlain("sessId", details['userId'])
-        sessId = details['userId']
-        forceUpdate()
-        Toast.show({
-          type: 'success',
-          text1: "Success",
-          text2: "Logged in successfully",
-          autoHide: true
+      .then((res) => {
+        account.get().then(details => {
+          console.log("DETAILS", details)
+          setPlain("sessId", details['$id'])
+          sessId = details['$id']
+          RNRestart.restart();
         })
       })
     }
@@ -76,6 +109,12 @@ export default function App() {
         autoHide: false
       })
     }
+  }
+
+  if (sessId) {
+    db.listDocuments("data", "flights").then((res) => {
+      console.log(res)
+    })
   }
 
   return (
@@ -116,7 +155,7 @@ export default function App() {
     </View>
     }
 
-    <Toast contentContainerStyle={{ width: 150 }} />
+    <Toast config={toastConfig} />
     </View>
   );
 }
